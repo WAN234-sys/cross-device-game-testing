@@ -1,0 +1,83 @@
+[gd_scene load_steps=9 format=3 uid="uid://buddymaze_player"]
+
+[ext_resource type="Script" path="res://scripts/player/player_controller.gd" id="1_player"]
+[ext_resource type="Script" path="res://scripts/visual/model_swap.gd" id="2_swap"]
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_body"]
+radius = 0.4
+height = 1.0
+
+[sub_resource type="CapsuleMesh" id="CapsuleMesh_bean"]
+radius = 0.4
+height = 1.0
+
+[sub_resource type="StandardMaterial3D" id="Mat_body"]
+albedo_color = Color(1, 1, 1, 1)
+roughness = 0.6
+
+[sub_resource type="SphereMesh" id="SphereMesh_eye"]
+radius = 0.08
+height = 0.16
+
+[sub_resource type="StandardMaterial3D" id="Mat_eye"]
+albedo_color = Color(0.05, 0.05, 0.05, 1)
+
+
+[node name="Player" type="CharacterBody3D"]
+collision_layer = 2
+collision_mask = 7
+script = ExtResource("1_player")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, 0)
+shape = SubResource("CapsuleShape3D_body")
+
+[node name="BodyMesh" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, 0)
+mesh = SubResource("CapsuleMesh_bean")
+surface_material_override/0 = SubResource("Mat_body")
+
+[node name="EyeLeft" type="MeshInstance3D" parent="BodyMesh"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.13, 0.25, -0.35)
+mesh = SubResource("SphereMesh_eye")
+surface_material_override/0 = SubResource("Mat_eye")
+
+[node name="EyeRight" type="MeshInstance3D" parent="BodyMesh"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.13, 0.25, -0.35)
+mesh = SubResource("SphereMesh_eye")
+surface_material_override/0 = SubResource("Mat_eye")
+
+[node name="BeanModel" type="Node3D" parent="."]
+script = ExtResource("2_swap")
+model_path = "res://assets/models/characters/player_bean.glb"
+placeholder = NodePath("../BodyMesh")
+target_size = 1.1
+rotate_y_deg = 180.0
+
+[node name="Head" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.8, 0)
+
+[node name="Camera3D" type="Camera3D" parent="Head"]
+fov = 80.0
+
+[node name="GrabRay" type="RayCast3D" parent="Head/Camera3D"]
+target_position = Vector3(0, 0, -3)
+collision_mask = 4
+
+[node name="InteractRay" type="RayCast3D" parent="Head/Camera3D"]
+target_position = Vector3(0, 0, -2.5)
+collision_mask = 30
+
+[node name="HatMount" type="Node3D" parent="Head"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.35, 0)
+
+[node name="NameLabel" type="Label3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.5, 0)
+billboard = 1
+text = "Player"
+font_size = 48
+outline_size = 8
+
+[node name="GrabJoint" type="Generic6DOFJoint3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.8, -1.5)
+

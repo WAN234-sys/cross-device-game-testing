@@ -1,0 +1,10 @@
+.godot/
+build/
+*.import.bak
+*.keystore
+export_credentials.cfg
+.DS_Store
+__MACOSX/
+Sound FX Starter Pack Vol. 1/
+*.tmp
+tools/last_map_check.txt

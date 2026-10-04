@@ -1,0 +1,58 @@
+[gd_scene load_steps=4 format=3 uid="uid://buddymaze_attic"]
+
+[ext_resource type="Script" path="res://scripts/maps/generic_map.gd" id="1_map"]
+[ext_resource type="PackedScene" path="res://scenes/characters/player.tscn" id="2_player"]
+
+[sub_resource type="Environment" id="Env"]
+background_mode = 1
+background_color = Color(0.25, 0.2, 0.18, 1)
+ambient_light_source = 2
+ambient_light_color = Color(0.9, 0.82, 0.7, 1)
+ambient_light_energy = 0.4
+tonemap_mode = 2
+ssao_enabled = true
+glow_enabled = true
+fog_enabled = true
+fog_light_color = Color(0.35, 0.28, 0.22, 1)
+fog_density = 0.03
+
+[sub_resource type="BoxShape3D" id="ExitShape"]
+size = Vector3(3, 2, 3)
+
+[node name="GrandmasAttic" type="Node3D"]
+script = ExtResource("1_map")
+player_scene = ExtResource("2_player")
+map_id = "grandmas_attic"
+seed = 3
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("Env")
+
+[node name="Sun" type="DirectionalLight3D" parent="."]
+transform = Transform3D(0.8, -0.4, 0.45, 0, 0.75, 0.66, -0.6, -0.53, 0.6, 0, 18, 0)
+light_energy = 0.7
+light_color = Color(1, 0.92, 0.78, 1)
+shadow_enabled = true
+
+[node name="ExitZone" type="Area3D" parent="."]
+collision_layer = 8
+collision_mask = 2
+
+[node name="Shape" type="CollisionShape3D" parent="ExitZone"]
+shape = SubResource("ExitShape")
+
+[node name="ExitLabel" type="Label3D" parent="ExitZone"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.2, 0)
+billboard = 1
+text = "🚪 EXIT — everyone together!"
+font_size = 56
+outline_size = 10
+
+[node name="ExitLight" type="OmniLight3D" parent="ExitZone"]
+light_color = Color(0.4, 1, 0.5, 1)
+light_energy = 3.0
+omni_range = 6.0
+
+[node name="Spawns" type="Node3D" parent="."]
+
+[node name="Players" type="Node3D" parent="."]

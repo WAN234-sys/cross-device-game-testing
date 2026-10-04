@@ -1,0 +1,89 @@
+name: Build Buddy Maze
+
+# Builds Windows .exe, Linux, Android .apk, and Web on every push to main
+# and on version tags. Tagged builds (v*) are attached to a GitHub Release.
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  workflow_dispatch:
+
+env:
+  GODOT_VERSION: "4.3"
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    container:
+      image: barichello/godot-ci:4.3
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - preset: "Windows Desktop"
+            out: build/windows/BuddyMaze.exe
+            dir: build/windows
+            artifact: BuddyMaze-windows
+          - preset: "Linux"
+            out: build/linux/BuddyMaze.x86_64
+            dir: build/linux
+            artifact: BuddyMaze-linux
+          - preset: "Android"
+            out: build/android/BuddyMaze.apk
+            dir: build/android
+            artifact: BuddyMaze-android
+          - preset: "Web"
+            out: build/web/index.html
+            dir: build/web
+            artifact: BuddyMaze-web
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install export templates
+        run: |
+          mkdir -p ~/.local/share/godot/export_templates
+          mv /root/.local/share/godot/export_templates/${GODOT_VERSION}.stable ~/.local/share/godot/export_templates/${GODOT_VERSION}.stable || true
+
+      - name: Android debug keystore
+        if: matrix.preset == 'Android'
+        run: |
+          keytool -genkeypair -v -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+          echo "GODOT_ANDROID_KEYSTORE_DEBUG_PATH=$(pwd)/debug.keystore" >> $GITHUB_ENV
+          echo "GODOT_ANDROID_KEYSTORE_DEBUG_USER=androiddebugkey" >> $GITHUB_ENV
+          echo "GODOT_ANDROID_KEYSTORE_DEBUG_PASSWORD=android" >> $GITHUB_ENV
+
+      - name: Import project
+        run: godot --headless --import || true
+
+      - name: Export ${{ matrix.preset }}
+        run: |
+          mkdir -p "${{ matrix.dir }}"
+          if [ "${{ matrix.preset }}" = "Android" ]; then
+            godot --headless --export-debug "${{ matrix.preset }}" "${{ matrix.out }}"
+          else
+            godot --headless --export-release "${{ matrix.preset }}" "${{ matrix.out }}"
+          fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: ${{ matrix.dir }}
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: export
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+      - name: Zip builds
+        run: |
+          cd dist
+          for d in */; do zip -r "${d%/}.zip" "$d"; done
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*.zip
