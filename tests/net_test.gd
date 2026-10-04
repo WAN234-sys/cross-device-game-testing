@@ -1,4 +1,4 @@
-﻿extends SceneTree
+extends SceneTree
 ## REAL network test: run two processes.
 ##   host:   godot --headless --path . --script res://tests/net_test.gd -- host
 ##   client: godot --headless --path . --script res://tests/net_test.gd -- client
