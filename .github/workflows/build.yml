@@ -74,6 +74,20 @@ jobs:
           if [ -d "/root/.local/share/godot/export_templates/${GODOT_VERSION}.${GODOT_STATUS}" ]; then
             ln -sf "/root/.local/share/godot/export_templates/${GODOT_VERSION}.${GODOT_STATUS}" "$TEMPLATES_DIR"
           fi
+          # Android export reads SDK/JDK paths from editor settings (lives under /root in the image)
+          mkdir -p ~/.config
+          if [ -d /root/.config/godot ] && [ ! -e ~/.config/godot ]; then cp -r /root/.config/godot ~/.config/godot; fi
+          mkdir -p ~/.config/godot
+          JAVA_DIR=$(dirname "$(dirname "$(readlink -f "$(which java)")")")
+          SETTINGS=~/.config/godot/editor_settings-${GODOT_VERSION}.tres
+          if [ ! -f "$SETTINGS" ]; then
+            printf '[gd_resource type="EditorSettings" format=3]\n\n[resource]\n' > "$SETTINGS"
+          fi
+          sed -i '/export\/android\/android_sdk_path/d;/export\/android\/java_sdk_path/d' "$SETTINGS"
+          echo "export/android/android_sdk_path = \"${ANDROID_HOME:-/usr/lib/android-sdk}\"" >> "$SETTINGS"
+          echo "export/android/java_sdk_path = \"$JAVA_DIR\"" >> "$SETTINGS"
+          echo "--- editor settings (android) ---"; grep android "$SETTINGS"
+          ls "$TEMPLATES_DIR"/ | grep -i android || echo "NO ANDROID TEMPLATE"
 
       - name: Android debug keystore
         run: |
