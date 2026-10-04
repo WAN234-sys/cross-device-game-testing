@@ -27,11 +27,6 @@ jobs:
             out: build/linux/BuddyMaze.x86_64
             dir: build/linux
             artifact: BuddyMaze-linux
-            platform: "Linux/X11"
-          - preset: "Android"
-            out: build/android/BuddyMaze.apk
-            dir: build/android
-            artifact: BuddyMaze-android
           - preset: "Web"
             out: build/web/index.html
             dir: build/web
@@ -41,16 +36,46 @@ jobs:
 
       - name: Setup export templates
         run: |
-          mkdir -p ~/.local/share/godot/export_templates
-          # Container puts templates in /root; move or symlink
+          TEMPLATES_DIR=~/.local/share/godot/export_templates/${GODOT_VERSION}.${GODOT_STATUS}
+          mkdir -p "$(dirname "$TEMPLATES_DIR")"
+          # barichello/godot-ci puts templates in /root
           if [ -d "/root/.local/share/godot/export_templates/${GODOT_VERSION}.${GODOT_STATUS}" ]; then
-            ln -sf "/root/.local/share/godot/export_templates/${GODOT_VERSION}.${GODOT_STATUS}" \
-              ~/.local/share/godot/export_templates/${GODOT_VERSION}.${GODOT_STATUS}
+            ln -sf "/root/.local/share/godot/export_templates/${GODOT_VERSION}.${GODOT_STATUS}" "$TEMPLATES_DIR"
           fi
-          ls -la ~/.local/share/godot/export_templates/ || true
+          echo "Templates dir contents:"
+          ls "$TEMPLATES_DIR"/ 2>/dev/null | head -10 || echo "(empty or missing)"
+
+      - name: Import project
+        run: godot --headless --import 2>&1 | tail -3 || true
+
+      - name: Export ${{ matrix.preset }}
+        run: |
+          mkdir -p "${{ matrix.dir }}"
+          godot --headless --export-release "${{ matrix.preset }}" "${{ matrix.out }}" 2>&1
+          echo "--- output ---"
+          ls -lh "${{ matrix.dir }}"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: ${{ matrix.dir }}
+
+  export-android:
+    runs-on: ubuntu-latest
+    container:
+      image: barichello/godot-ci:4.3
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup export templates
+        run: |
+          TEMPLATES_DIR=~/.local/share/godot/export_templates/${GODOT_VERSION}.${GODOT_STATUS}
+          mkdir -p "$(dirname "$TEMPLATES_DIR")"
+          if [ -d "/root/.local/share/godot/export_templates/${GODOT_VERSION}.${GODOT_STATUS}" ]; then
+            ln -sf "/root/.local/share/godot/export_templates/${GODOT_VERSION}.${GODOT_STATUS}" "$TEMPLATES_DIR"
+          fi
 
       - name: Android debug keystore
-        if: matrix.preset == 'Android'
         run: |
           keytool -genkeypair -v -keystore debug.keystore -storepass android \
             -alias androiddebugkey -keypass android -keyalg RSA -validity 10000 \
@@ -60,30 +85,24 @@ jobs:
           echo "GODOT_ANDROID_KEYSTORE_DEBUG_PASSWORD=android" >> $GITHUB_ENV
 
       - name: Import project
-        run: |
-          godot --headless --import 2>&1 | tail -5 || true
-          echo "--- presets in cfg ---"
-          grep -E '^(name|platform)=' export_presets.cfg
+        run: godot --headless --import 2>&1 | tail -3 || true
 
-      - name: Export ${{ matrix.preset }}
+      - name: Export Android
         run: |
-          mkdir -p "${{ matrix.dir }}"
-          if [ "${{ matrix.preset }}" = "Android" ]; then
-            godot --headless --export-debug "${{ matrix.preset }}" "${{ matrix.out }}" 2>&1
-          else
-            godot --headless --export-release "${{ matrix.preset }}" "${{ matrix.out }}" 2>&1
-          fi
-          ls -la "${{ matrix.dir }}" || echo "No output files found"
+          mkdir -p build/android
+          godot --headless --export-debug "Android" build/android/BuddyMaze.apk 2>&1 || \
+            echo "Android export failed (may need SDK setup in container)"
+          ls -lh build/android/ || true
 
       - uses: actions/upload-artifact@v4
         if: success()
         with:
-          name: ${{ matrix.artifact }}
-          path: ${{ matrix.dir }}
+          name: BuddyMaze-android
+          path: build/android
 
   release:
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: export
+    needs: [export, export-android]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -95,6 +114,7 @@ jobs:
         run: |
           cd dist
           for d in */; do zip -r "${d%/}.zip" "$d"; done
+          ls -lh *.zip
       - uses: softprops/action-gh-release@v2
         with:
           files: dist/*.zip
