@@ -90,9 +90,9 @@ jobs:
       - name: Export Android
         run: |
           mkdir -p build/android
-          godot --headless --export-debug "Android" build/android/BuddyMaze.apk 2>&1 || \
-            echo "Android export failed (may need SDK setup in container)"
-          ls -lh build/android/ || true
+          godot --headless --export-debug "Android" build/android/BuddyMaze.apk 2>&1
+          ls -lh build/android/
+          test -f build/android/BuddyMaze.apk
 
       - uses: actions/upload-artifact@v4
         if: success()
