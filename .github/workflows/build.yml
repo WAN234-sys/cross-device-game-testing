@@ -1,8 +1,5 @@
 name: Build Buddy Maze
 
-# Builds Windows .exe, Linux, Android .apk, and Web on every push to main
-# and on version tags. Tagged builds (v*) are attached to a GitHub Release.
-
 on:
   push:
     branches: [main]
@@ -11,6 +8,7 @@ on:
 
 env:
   GODOT_VERSION: "4.3"
+  GODOT_STATUS: "stable"
 
 jobs:
   export:
@@ -29,6 +27,7 @@ jobs:
             out: build/linux/BuddyMaze.x86_64
             dir: build/linux
             artifact: BuddyMaze-linux
+            platform: "Linux/X11"
           - preset: "Android"
             out: build/android/BuddyMaze.apk
             dir: build/android
@@ -40,32 +39,44 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install export templates
+      - name: Setup export templates
         run: |
           mkdir -p ~/.local/share/godot/export_templates
-          mv /root/.local/share/godot/export_templates/${GODOT_VERSION}.stable ~/.local/share/godot/export_templates/${GODOT_VERSION}.stable || true
+          # Container puts templates in /root; move or symlink
+          if [ -d "/root/.local/share/godot/export_templates/${GODOT_VERSION}.${GODOT_STATUS}" ]; then
+            ln -sf "/root/.local/share/godot/export_templates/${GODOT_VERSION}.${GODOT_STATUS}" \
+              ~/.local/share/godot/export_templates/${GODOT_VERSION}.${GODOT_STATUS}
+          fi
+          ls -la ~/.local/share/godot/export_templates/ || true
 
       - name: Android debug keystore
         if: matrix.preset == 'Android'
         run: |
-          keytool -genkeypair -v -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+          keytool -genkeypair -v -keystore debug.keystore -storepass android \
+            -alias androiddebugkey -keypass android -keyalg RSA -validity 10000 \
+            -dname "CN=Android Debug,O=Android,C=US"
           echo "GODOT_ANDROID_KEYSTORE_DEBUG_PATH=$(pwd)/debug.keystore" >> $GITHUB_ENV
           echo "GODOT_ANDROID_KEYSTORE_DEBUG_USER=androiddebugkey" >> $GITHUB_ENV
           echo "GODOT_ANDROID_KEYSTORE_DEBUG_PASSWORD=android" >> $GITHUB_ENV
 
       - name: Import project
-        run: godot --headless --import || true
+        run: |
+          godot --headless --import 2>&1 | tail -5 || true
+          echo "--- presets in cfg ---"
+          grep -E '^(name|platform)=' export_presets.cfg
 
       - name: Export ${{ matrix.preset }}
         run: |
           mkdir -p "${{ matrix.dir }}"
           if [ "${{ matrix.preset }}" = "Android" ]; then
-            godot --headless --export-debug "${{ matrix.preset }}" "${{ matrix.out }}"
+            godot --headless --export-debug "${{ matrix.preset }}" "${{ matrix.out }}" 2>&1
           else
-            godot --headless --export-release "${{ matrix.preset }}" "${{ matrix.out }}"
+            godot --headless --export-release "${{ matrix.preset }}" "${{ matrix.out }}" 2>&1
           fi
+          ls -la "${{ matrix.dir }}" || echo "No output files found"
 
       - uses: actions/upload-artifact@v4
+        if: success()
         with:
           name: ${{ matrix.artifact }}
           path: ${{ matrix.dir }}
@@ -87,3 +98,4 @@ jobs:
       - uses: softprops/action-gh-release@v2
         with:
           files: dist/*.zip
+          generate_release_notes: true
